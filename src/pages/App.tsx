@@ -14,9 +14,15 @@ import type {
 } from "../engine/types";
 
 type Screen = "home" | "game" | "privacy";
+type SetupTouched = {
+  mode: boolean;
+  visibility: boolean;
+  formation: boolean;
+};
 
 const sportingTeamName = "Sporting de Gijón";
 const balancedSeasonText = "1980-2026";
+const emptySetup: SetupTouched = { mode: false, visibility: false, formation: false };
 
 const maxRerolls = (poolMode: PoolMode, visibility: VisibilityMode) => {
   if (poolMode === "easy" && visibility === "visible") return 4;
@@ -77,6 +83,8 @@ export function App() {
   const [selectedPlayer, setSelectedPlayer] = useState<SportingPlayer | null>(null);
   const [result, setResult] = useState<SimulationResult | null>(null);
   const [gameSeed, setGameSeed] = useState(() => Math.random().toString(36).slice(2));
+  const [draftLocked, setDraftLocked] = useState(false);
+  const [setupTouched, setSetupTouched] = useState<SetupTouched>(emptySetup);
 
   useEffect(() => {
     fetch("/data/game-data.json")
@@ -91,6 +99,8 @@ export function App() {
   const slots = formations[formation];
   const completePicks = completedPicks(picks);
   const isComplete = completePicks.length === slots.length;
+  const setupComplete = setupTouched.mode && setupTouched.visibility && setupTouched.formation;
+  const hasPendingRoll = Boolean(rolledSeason);
   const draftStrength = isComplete ? calculateStrength(completePicks) : null;
   const visibleRating = visibility === "visible";
   const availablePlayers = useMemo(() => {
@@ -116,18 +126,29 @@ export function App() {
     setRolledSeason(null);
     setSelectedPlayer(null);
     setResult(null);
+    setRollCount(0);
     setRerollsLeft(maxRerolls(nextPool, nextVisibility));
     setGameSeed(Math.random().toString(36).slice(2));
+    setDraftLocked(false);
+  }
+
+  function resetEverything() {
+    setPoolMode("easy");
+    setVisibility("visible");
+    setSetupTouched(emptySetup);
+    resetDraft(defaultFormation, "easy", "visible");
   }
 
   function doRoll(isReroll = false) {
     if (!data) return;
-    if (isReroll && rerollsLeft <= 0) return;
+    if (!isReroll && rolledSeason) return;
+    if (isReroll && (!rolledSeason || rerollsLeft <= 0)) return;
     const seed = `${gameSeed}:${rollCount}:${Date.now()}:${Math.random()}`;
     const season = rollSeason(data.sportingPlayers, poolMode, picks, formation, seed);
     setRolledSeason(season);
     setSelectedPlayer(null);
     setRollCount((value) => value + 1);
+    setDraftLocked(true);
     if (isReroll) setRerollsLeft((value) => Math.max(0, value - 1));
   }
 
@@ -152,12 +173,59 @@ export function App() {
   function simulate() {
     if (!data || !isComplete) return;
     setResult(simulateSeason(completePicks, data.opponents, data.fixtures, gameSeed));
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+      });
+    });
   }
 
   function chooseModeFromHome(mode: PoolMode) {
+    if (draftLocked) return;
     setPoolMode(mode);
+    setSetupTouched((current) => ({ ...current, mode: true }));
     resetDraft(formation, mode, visibility);
+  }
+
+  function chooseVisibilityFromHome(mode: VisibilityMode) {
+    if (draftLocked) return;
+    setVisibility(mode);
+    setSetupTouched((current) => ({ ...current, visibility: true }));
+    resetDraft(formation, poolMode, mode);
+  }
+
+  function chooseFormationFromHome(nextFormation: string) {
+    if (draftLocked) return;
+    setSetupTouched((current) => ({ ...current, formation: true }));
+    resetDraft(nextFormation, poolMode, visibility);
+  }
+
+  function startGame() {
+    if (draftLocked) {
+      setScreen("game");
+      return;
+    }
+    if (!setupComplete) return;
+    resetDraft(formation, poolMode, visibility);
     setScreen("game");
+  }
+
+  function newAttempt() {
+    resetEverything();
+    setScreen("home");
+  }
+
+  function navigate(target: Screen) {
+    if (target === "home" && (screen === "game" || draftLocked || Boolean(result) || Boolean(rolledSeason) || completePicks.length > 0)) {
+      resetEverything();
+      setScreen("home");
+      return;
+    }
+    if (target === "game") {
+      startGame();
+      return;
+    }
+    setScreen(target);
   }
 
   if (loadingError) {
@@ -177,7 +245,12 @@ export function App() {
         ["game", "Juego"],
         ["privacy", "Privacidad"],
       ] as Array<[Screen, string]>).map(([target, label]) => (
-        <button key={target} className={screen === target ? "active" : ""} onClick={() => setScreen(target)}>
+        <button
+          key={target}
+          className={screen === target ? "active" : ""}
+          disabled={target === "game" && !setupComplete && screen !== "game"}
+          onClick={() => navigate(target)}
+        >
           {label}
         </button>
       ))}
@@ -188,7 +261,7 @@ export function App() {
     return (
       <main className="shell">
         <header className="site-header">
-          <button className="brand-lockup" onClick={() => setScreen("home")}>
+          <button className="brand-lockup" onClick={() => navigate("home")}>
             <span>11</span>
             <strong>Once Rojiblanco</strong>
           </button>
@@ -224,7 +297,7 @@ export function App() {
     return (
       <main className="shell">
         <header className="site-header">
-          <button className="brand-lockup" onClick={() => setScreen("home")}>
+          <button className="brand-lockup" onClick={() => navigate("home")}>
             <span>11</span>
             <strong>Once Rojiblanco</strong>
           </button>
@@ -239,11 +312,11 @@ export function App() {
               Sortea temporadas del Sporting desde {balancedSeasonText}, elige jugadores históricos compatibles con tu sistema y simula la liga completa de Segunda.
             </p>
             <div className="hero-actions">
-              <button className="icon-text primary" onClick={() => setScreen("game")}>
-                <Play size={18} /> Jugar ahora
+              <button className="icon-text primary" disabled={!setupComplete && !draftLocked} onClick={startGame}>
+                <Play size={18} /> {draftLocked ? "Volver al juego" : "Jugar ahora"}
               </button>
-              <button className="icon-text" onClick={() => chooseModeFromHome("hard")}>
-                <Dice5 size={18} /> Probar modo difícil
+              <button className="icon-text" disabled={draftLocked} onClick={() => chooseModeFromHome("hard")}>
+                <Dice5 size={18} /> Elegir modo difícil
               </button>
             </div>
           </div>
@@ -277,13 +350,63 @@ export function App() {
           </div>
         </section>
 
+        <section className="controls-band home-setup">
+          <div className="control-group">
+            <span className="label">Modo</span>
+            <div className="segmented">
+              {(["easy", "hard"] as PoolMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  className={setupTouched.mode && poolMode === mode ? "active" : ""}
+                  disabled={draftLocked}
+                  onClick={() => chooseModeFromHome(mode)}
+                >
+                  {modeLabel(mode)}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="control-group">
+            <span className="label">Información</span>
+            <div className="segmented compact">
+              {(["visible", "hidden"] as VisibilityMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  className={setupTouched.visibility && visibility === mode ? "active" : ""}
+                  disabled={draftLocked}
+                  onClick={() => chooseVisibilityFromHome(mode)}
+                >
+                  {mode === "visible" ? <Eye size={16} /> : <EyeOff size={16} />}
+                  {visibilityLabel(mode)}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="control-group formation-control">
+            <span className="label">Formación</span>
+            <select
+              value={setupTouched.formation ? formation : ""}
+              disabled={draftLocked}
+              onChange={(event) => chooseFormationFromHome(event.target.value)}
+            >
+              <option value="" disabled>Elige formación</option>
+              {Object.keys(formations).map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
+          </div>
+        </section>
+        <p className="model-disclaimer home-disclaimer">
+          Modo fácil limitado a temporadas {balancedSeasonText}. Medias estimadas con división, clasificación final, minutos, titularidad, goles y posición.
+        </p>
+
         <section className="mode-showcase">
-          <button className="mode-card" onClick={() => chooseModeFromHome("easy")}>
+          <button className={`mode-card ${setupTouched.mode && poolMode === "easy" ? "active" : ""}`} disabled={draftLocked} onClick={() => chooseModeFromHome("easy")}>
             <span className="label">Modo fácil</span>
             <strong>Primera + Segunda</strong>
             <small>Equilibrado a partir de {balancedSeasonText}, para que los años setenta no rompan la dificultad.</small>
           </button>
-          <button className="mode-card" onClick={() => chooseModeFromHome("hard")}>
+          <button className={`mode-card ${setupTouched.mode && poolMode === "hard" ? "active" : ""}`} disabled={draftLocked} onClick={() => chooseModeFromHome("hard")}>
             <span className="label">Modo difícil</span>
             <strong>Solo Segunda</strong>
             <small>Menos estrellas, más oficio y más dependencia del sorteo.</small>
@@ -334,7 +457,7 @@ export function App() {
     return (
       <main className="shell">
         <header className="site-header">
-          <button className="brand-lockup" onClick={() => setScreen("home")}>
+          <button className="brand-lockup" onClick={() => navigate("home")}>
             <span>11</span>
             <strong>Once Rojiblanco</strong>
           </button>
@@ -350,7 +473,7 @@ export function App() {
             <button className="icon-text" onClick={shareResult}>
               <Share2 size={18} /> Compartir
             </button>
-            <button className="icon-text ghost" onClick={() => resetDraft()}>
+            <button className="icon-text ghost" onClick={newAttempt}>
               <RotateCcw size={18} /> Nuevo intento
             </button>
           </div>
@@ -372,12 +495,36 @@ export function App() {
             <div><span className="label">OVR</span><strong>{simulationResult.strength.overall}</strong></div>
             <div><span className="label">ATA</span><strong>{simulationResult.strength.attack}</strong></div>
             <div><span className="label">DEF</span><strong>{simulationResult.strength.defense}</strong></div>
-            <div><span className="label">Modo</span><strong>{modeLabel(poolMode)}</strong></div>
-            <div><span className="label">Medias</span><strong>{visibilityLabel(visibility)}</strong></div>
           </div>
           <p className="model-disclaimer">
             Medias estimadas con división, clasificación final, minutos, titularidad, goles y posición. Es un modelo lúdico y puede contener errores históricos.
           </p>
+
+          <div className="result-lineup-wrap">
+            <h3>Tu once</h3>
+            <div className="pitch result-lineup" aria-label="Once utilizado en la simulación">
+              <div className="midline" />
+              <div className="circle" />
+              {slots.map((slot, index) => {
+                const pick = picks[index];
+                return (
+                  <div
+                    key={slot.id}
+                    className={`disc ${pick ? "filled" : ""}`}
+                    style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
+                  >
+                    <span className="disc-pos">{slot.position}</span>
+                    {pick && (
+                      <>
+                        <span className="disc-name">{pick.player.shortName}</span>
+                        <span className="disc-rating">{visibleRating ? pick.adjustedRating : "?"}</span>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
           <div className="result-grid">
             <div className="table-wrap">
@@ -432,7 +579,7 @@ export function App() {
   return (
     <main className="shell">
       <header className="site-header">
-        <button className="brand-lockup" onClick={() => setScreen("home")}>
+        <button className="brand-lockup" onClick={() => navigate("home")}>
           <span>11</span>
           <strong>Once Rojiblanco</strong>
         </button>
@@ -449,58 +596,6 @@ export function App() {
         </button>
       </section>
 
-      <section className="controls-band">
-        <div className="control-group">
-          <span className="label">Modo</span>
-          <div className="segmented">
-            {(["easy", "hard"] as PoolMode[]).map((mode) => (
-              <button
-                key={mode}
-                className={poolMode === mode ? "active" : ""}
-                onClick={() => {
-                  setPoolMode(mode);
-                  resetDraft(formation, mode, visibility);
-                }}
-              >
-                {modeLabel(mode)}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="control-group">
-          <span className="label">Información</span>
-          <div className="segmented compact">
-            {(["visible", "hidden"] as VisibilityMode[]).map((mode) => (
-              <button
-                key={mode}
-                className={visibility === mode ? "active" : ""}
-                onClick={() => {
-                  setVisibility(mode);
-                  resetDraft(formation, poolMode, mode);
-                }}
-              >
-                {mode === "visible" ? <Eye size={16} /> : <EyeOff size={16} />}
-                {visibilityLabel(mode)}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="control-group formation-control">
-          <span className="label">Formación</span>
-          <select
-            value={formation}
-            onChange={(event) => resetDraft(event.target.value, poolMode, visibility)}
-          >
-            {Object.keys(formations).map((name) => (
-              <option key={name} value={name}>{name}</option>
-            ))}
-          </select>
-        </div>
-      </section>
-      <p className="model-disclaimer">
-        Modo fácil limitado a temporadas {balancedSeasonText}. Medias estimadas con división, clasificación final, minutos, titularidad, goles y posición.
-      </p>
-
       <section className="layout">
         <div className="left-panel">
           <div className="roll-panel">
@@ -509,7 +604,7 @@ export function App() {
               <h2>{rolledSeason ? `Temporada ${rolledSeason}` : "Tira para buscar plantilla"}</h2>
             </div>
             <div className="roll-actions">
-              <button className="icon-text primary" disabled={isComplete} onClick={() => doRoll(false)}>
+              <button className="icon-text primary" disabled={isComplete || hasPendingRoll} onClick={() => doRoll(false)}>
                 <Dice5 size={18} /> Tirar
               </button>
               <button className="icon-text" disabled={isComplete || !rolledSeason || rerollsLeft <= 0} onClick={() => doRoll(true)}>
@@ -523,7 +618,7 @@ export function App() {
               {availablePlayers.length === 0 ? (
                 <p className="muted">No queda nadie compatible en esta plantilla. Tira otra vez.</p>
               ) : (
-                availablePlayers.slice(0, 28).map((player) => (
+                availablePlayers.map((player) => (
                   <button
                     key={`${player.season}:${player.playerId}:${player.positionCode}`}
                     className={`player-row ${selectedPlayer?.playerId === player.playerId ? "selected" : ""}`}
@@ -573,8 +668,6 @@ export function App() {
           </div>
           <div className="team-box">
             <div><span className="label">Alineación</span><strong>{completePicks.length}/11</strong></div>
-            <div><span className="label">Modo</span><strong>{modeLabel(poolMode)}</strong></div>
-            <div><span className="label">Medias</span><strong>{visibilityLabel(visibility)}</strong></div>
             {draftStrength && visibleRating && (
               <>
                 <div><span className="label">OVR</span><strong>{draftStrength.overall}</strong></div>
