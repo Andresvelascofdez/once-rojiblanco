@@ -886,8 +886,13 @@ tr.me {
 
 @media (max-width: 720px) {
   .shell {
-    width: min(100% - 20px, 1420px);
-    padding-top: 14px;
+    width: min(100% - 16px, 1420px);
+    padding: 10px 0 28px;
+  }
+
+  .site-header {
+    min-height: 0;
+    margin-bottom: 18px;
   }
 
   .site-header,
@@ -913,13 +918,18 @@ tr.me {
     justify-content: center;
   }
 
+  .brand-lockup span {
+    width: 38px;
+    height: 38px;
+  }
+
   .home-hero {
     min-height: 0;
-    gap: 22px;
+    gap: 18px;
   }
 
   .hero-copy h1 {
-    font-size: 48px;
+    font-size: 44px;
   }
 
   .hero-copy p:not(.eyebrow) {
@@ -942,19 +952,38 @@ tr.me {
   }
 
   .lineup-preview {
-    min-height: 460px;
+    width: min(100%, 380px);
+    min-height: 390px;
   }
 
   .result-actions {
     justify-content: stretch;
   }
 
+  .privacy-page h1,
+  .game-title h1,
+  .result-topline h1 {
+    font-size: 38px;
+    line-height: 1.02;
+  }
+
   .topbar h1 {
     font-size: 38px;
   }
 
+  .controls-band {
+    gap: 10px;
+    margin: 8px 0 10px;
+  }
+
+  .model-disclaimer {
+    margin-bottom: 12px;
+    font-size: 12px;
+  }
+
   .segmented {
     grid-template-columns: 1fr;
+    min-height: 0;
   }
 
   .roll-actions {
@@ -967,59 +996,177 @@ tr.me {
     width: 100%;
   }
 
+  .roll-panel {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .roll-panel h2 {
+    font-size: 20px;
+  }
+
+  .player-list {
+    max-height: 330px;
+    margin-top: 10px;
+  }
+
+  .player-row {
+    grid-template-columns: minmax(0, 1fr) 42px;
+    min-height: 56px;
+    padding: 8px 10px;
+  }
+
+  .rating {
+    width: 38px;
+    height: 38px;
+  }
+
   .pitch {
-    min-height: 620px;
+    min-height: 560px;
     aspect-ratio: 9 / 14;
   }
 
   .disc {
-    width: 92px;
-    min-height: 78px;
+    grid-template-rows: 16px minmax(18px, auto) 18px;
+    width: 86px;
+    min-height: 72px;
+    padding: 7px;
   }
 
   .disc-name {
-    font-size: 12px;
+    font-size: 11.5px;
   }
 
   .team-box {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .team-box > div {
+    min-height: 62px;
+    padding: 9px;
+  }
+
+  .strength-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .result-hero {
+    align-items: flex-start;
+    padding: 14px;
+  }
+
   .fixture-row {
     grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .fixture-list {
+    max-height: 520px;
   }
 }
 
 @media (max-width: 430px) {
+  .shell {
+    width: min(100% - 12px, 1420px);
+  }
+
   .topbar h1 {
     font-size: 34px;
   }
 
   .hero-copy h1 {
-    font-size: 40px;
+    font-size: 38px;
+  }
+
+  .hero-copy p:not(.eyebrow) {
+    font-size: 16px;
+  }
+
+  .mode-card {
+    min-height: 128px;
+    padding: 14px;
   }
 
   .lineup-preview {
-    min-height: 420px;
+    min-height: 340px;
   }
 
   .preview-chip {
-    width: 62px;
-    height: 50px;
-    font-size: 12px;
+    width: 56px;
+    height: 44px;
+    font-size: 11px;
   }
 
   .preview-score {
-    width: 82px;
-    height: 64px;
+    width: 76px;
+    height: 58px;
+  }
+
+  .preview-score strong {
+    font-size: 30px;
+  }
+
+  .privacy-page h1,
+  .game-title h1,
+  .result-topline h1 {
+    font-size: 34px;
+  }
+
+  .site-nav button,
+  .segmented button {
+    font-size: 13px;
+  }
+
+  .player-list {
+    max-height: 280px;
   }
 
   .disc {
-    width: 84px;
+    width: 76px;
+    min-height: 66px;
     padding: 6px;
+  }
+
+  .disc-pos {
+    font-size: 11px;
+  }
+
+  .disc-name {
+    font-size: 10.5px;
+  }
+
+  .disc-rating {
+    min-width: 24px;
+    padding: 1px 5px;
+  }
+
+  .pitch {
+    min-height: 500px;
   }
 
   .team-box {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 360px) {
+  .hero-copy h1,
+  .privacy-page h1,
+  .game-title h1,
+  .result-topline h1,
+  .topbar h1 {
+    font-size: 32px;
+  }
+
+  .site-nav {
+    grid-template-columns: 1fr;
+  }
+
+  .pitch {
+    min-height: 470px;
+  }
+
+  .disc {
+    width: 70px;
+    min-height: 62px;
   }
 }
